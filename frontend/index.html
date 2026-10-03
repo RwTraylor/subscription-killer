@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subscription Killer</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+  .burn { font-size: 2.5rem; font-weight: 700; }
+  .card { border: 1px solid #ddd; border-radius: 12px; padding: 1rem; margin: 1rem 0; }
+  .zombie { border-color: #e5484d; }
+  .score { float: right; font-weight: 700; color: #e5484d; }
+  button { padding: .6rem 1.2rem; border-radius: 8px; border: none; cursor: pointer; }
+  .kill { background: #e5484d; color: white; }
+  .connect { background: #003087; color: white; font-size: 1.1rem; }
+  #saved { font-size: 1.5rem; color: #2e7d32; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>🔪 Subscription Killer</h1>
+<p>Finds the subscriptions you forgot. Kills them in one tap.</p>
+<button class="connect" id="connectBtn">Connect PayPal (sandbox)</button>
+<div id="dashboard" style="display:none">
+  <p>You're burning <span class="burn" id="burn">$0</span>/month on subscriptions.</p>
+  <p id="saved" style="display:none">Killed: <span id="savedAmt">$0</span>/month saved 💰</p>
+  <div id="list"></div>
+</div>
+<script>
+const api = (m, u, b) => fetch(u, {method: m, headers: {'Content-Type':'application/json'}, body: b ? JSON.stringify(b) : undefined}).then(r => r.json());
+let saved = 0;
+document.getElementById('connectBtn').onclick = async () => {
+  // In the demo this uses a sandbox auth code; wired to the OAuth flow next.
+  document.getElementById('connectBtn').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  const data = await api('GET', '/api/subscriptions');
+  document.getElementById('burn').textContent = '$' + data.total_monthly_burn.toFixed(2);
+  const list = document.getElementById('list');
+  data.subscriptions.forEach(s => {
+    const d = document.createElement('div');
+    d.className = 'card' + (s.zombie_score >= 50 ? ' zombie' : '');
+    d.innerHTML = `<span class="score">🧟 ${s.zombie_score}</span>
+      <h3>${s.merchant} — $${s.amount}/${s.cadence}</h3>
+      <p>${s.plain_english}</p><p><em>${s.reason}</em></p>
+      <button class="kill">Kill it</button>`;
+    d.querySelector('button').onclick = async (e) => {
+      if (s.subscription_id) await api('POST', `/api/subscriptions/${s.subscription_id}/cancel`);
+      saved += s.monthly_cost;
+      document.getElementById('saved').style.display = 'block';
+      document.getElementById('savedAmt').textContent = '$' + saved.toFixed(2);
+      e.target.disabled = true; e.target.textContent = 'Killed ✓';
+    };
+    list.appendChild(d);
+  });
+};
+</script>
+</body>
+</html>
